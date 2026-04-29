@@ -70650,5 +70650,8 @@ const FAULTS = [
     "internalNotes": ""
   }
 ];
-
-export default FAULTS;
+const FAULTS = [
+  { ... },
+  { ... },
+  ...
+];
