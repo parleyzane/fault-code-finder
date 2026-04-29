@@ -70650,8 +70650,3 @@ const FAULTS = [
     "internalNotes": ""
   }
 ];
-const FAULTS = [
-  { ... },
-  { ... },
-  ...
-];
