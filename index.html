@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Fault Code Finder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#20232a" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background:#111; color:#eee; }
+    header { padding: 1rem; background:#20232a; position:sticky; top:0; z-index:10; }
+    h1 { margin:0 0 .5rem; font-size:1.2rem; }
+    input[type="search"] {
+      width: 100%; padding:.6rem .8rem; border-radius:.4rem;
+      border:1px solid #444; background:#181a1f; color:#eee;
+    }
+    main { padding: 1rem; display:flex; flex-direction:column; gap:1rem; }
+    @media (min-width: 900px) {
+      main { flex-direction:row; align-items:flex-start; }
+      #results, #pinned { flex:1; }
+    }
+    .panel { background:#181a1f; border-radius:.5rem; padding:.75rem; border:1px solid #333; }
+    .panel h2 { margin:0 0 .5rem; font-size:1rem; }
+    .fault-card {
+      border-radius:.4rem; border:1px solid #333; padding:.5rem .6rem;
+      margin-bottom:.5rem; background:#1f2229; font-size:.85rem;
+      display:flex; flex-direction:column; gap:.25rem;
+    }
+    .fault-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; }
+    .spn { font-weight:bold; font-size:.95rem; }
+    .tag { font-size:.7rem; padding:.1rem .35rem; border-radius:.3rem; border:1px solid #555; }
+    button.pin-btn {
+      background:none; border:none; color:#ffcc4d; cursor:pointer; font-size:1.1rem;
+    }
+    button.pin-btn.pinned { color:#4dff88; }
+    .label { font-weight:600; font-size:.75rem; color:#aaa; }
+    .value { font-size:.8rem; }
+    .empty { font-size:.8rem; color:#888; font-style:italic; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fault Code Finder</h1>
+    <input id="searchInput" type="search" placeholder="Search by SPN (e.g. 520192)" autocomplete="off" />
+  </header>
+
+  <main>
+    <section id="results" class="panel">
+      <h2>Results</h2>
+      <div id="resultsList"></div>
+    </section>
+
+    <section id="pinned" class="panel">
+      <h2>Pinned faults</h2>
+      <div id="pinnedList" class="empty">No faults pinned yet.</div>
+    </section>
+  </main>
+
+  <script src="faults.js"></script>
+  <script>
+    const searchInput = document.getElementById('searchInput');
+    const resultsList = document.getElementById('resultsList');
+    const pinnedList = document.getElementById('pinnedList');
+
+    const PIN_KEY = 'fault_pins_v1';
+    let pinnedSpns = new Set(JSON.parse(localStorage.getItem(PIN_KEY) || '[]'));
+
+    function savePins() {
+      localStorage.setItem(PIN_KEY, JSON.stringify([...pinnedSpns]));
+    }
+
+    function createFaultCard(fault, isPinnedView = false) {
+      const card = document.createElement('div');
+      card.className = 'fault-card';
+
+      const header = document.createElement('div');
+      header.className = 'fault-header';
+
+      const left = document.createElement('div');
+      const spn = document.createElement('div');
+      spn.className = 'spn';
+      spn.textContent = `SPN ${fault.spn}  (FMI ${fault.fmi})`;
+      const system = document.createElement('div');
+      system.className = 'value';
+      system.textContent = `${fault.system} – ${fault.module}`;
+      left.appendChild(spn);
+      left.appendChild(system);
+
+      const right = document.createElement('div');
+      const sev = document.createElement('span');
+      sev.className = 'tag';
+      sev.textContent = fault.severity || 'INFO';
+      const pinBtn = document.createElement('button');
+      pinBtn.className = 'pin-btn' + (pinnedSpns.has(fault.spn) ? ' pinned' : '');
+      pinBtn.innerHTML = pinnedSpns.has(fault.spn) ? '★' : '☆';
+      pinBtn.title = pinnedSpns.has(fault.spn) ? 'Unpin fault' : 'Pin fault';
+
+      pinBtn.addEventListener('click', () => {
+        if (pinnedSpns.has(fault.spn)) {
+          pinnedSpns.delete(fault.spn);
+        } else {
+          pinnedSpns.add(fault.spn);
+        }
+        savePins();
+        renderResults();
+        renderPinned();
+      });
+
+      right.appendChild(sev);
+      right.appendChild(pinBtn);
+
+      header.appendChild(left);
+      header.appendChild(right);
+
+      const desc = document.createElement('div');
+      desc.innerHTML = `
+        <div><span class="label">Description:</span> <span class="value">${fault.description || ''}</span></div>
+        <div><span class="label">Failure mode:</span> <span class="value">${fault.failureModeShort || ''}</span></div>
+        <div><span class="label">Low condition:</span> <span class="value">${fault.lowCondition || ''}</span></div>
+        <div><span class="label">High condition:</span> <span class="value">${fault.highCondition || ''}</span></div>
+        <div><span class="label">Supplier:</span> <span class="value">${fault.supplier || ''}</span></div>
+        <div><span class="label">CAN ID / SA:</span> <span class="value">${fault.canId || ''}  /  ${fault.sourceAddress || ''}</span></div>
+      `;
+
+      card.appendChild(header);
+      card.appendChild(desc);
+      return card;
+    }
+
+    function renderResults() {
+      const q = searchInput.value.trim();
+      resultsList.innerHTML = '';
+
+      if (!q) {
+        resultsList.innerHTML = '<div class="empty">Type an SPN number to search.</div>';
+        return;
+      }
+
+      const matches = FAULTS.filter(f => f.spn.startsWith(q));
+      if (!matches.length) {
+        resultsList.innerHTML = '<div class="empty">No faults found for that SPN.</div>';
+        return;
+      }
+
+      matches.forEach(f => resultsList.appendChild(createFaultCard(f)));
+    }
+
+    function renderPinned() {
+      pinnedList.innerHTML = '';
+      const pinned = FAULTS.filter(f => pinnedSpns.has(f.spn));
+      if (!pinned.length) {
+        pinnedList.classList.add('empty');
+        pinnedList.textContent = 'No faults pinned yet.';
+        return;
+      }
+      pinnedList.classList.remove('empty');
+      pinned.forEach(f => pinnedList.appendChild(createFaultCard(f, true)));
+    }
+
+    searchInput.addEventListener('input', renderResults);
+
+    // Initial render
+    renderResults();
+    renderPinned();
+
+    // PWA registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  </script>
+</body>
+</html>
