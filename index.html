@@ -1,5 +1,7 @@
 <script src="faults.js"></script>
 <script>
+document.addEventListener("DOMContentLoaded", () => {
+
   const searchInput = document.getElementById('searchInput');
   const resultsList = document.getElementById('resultsList');
   const pinnedList = document.getElementById('pinnedList');
@@ -11,9 +13,6 @@
     localStorage.setItem(PIN_KEY, JSON.stringify([...pinnedSpns]));
   }
 
-  // -----------------------------
-  // Create a fault card
-  // -----------------------------
   function createFaultCard(fault, isPinnedView = false) {
     const card = document.createElement('div');
     card.className = 'fault-card';
@@ -43,7 +42,6 @@
     const pinBtn = document.createElement('button');
     pinBtn.className = 'pin-btn' + (pinnedSpns.has(fault.spn) ? ' pinned' : '');
     pinBtn.innerHTML = pinnedSpns.has(fault.spn) ? '★' : '☆';
-    pinBtn.title = pinnedSpns.has(fault.spn) ? 'Unpin fault' : 'Pin fault';
 
     pinBtn.addEventListener('click', () => {
       if (pinnedSpns.has(fault.spn)) {
@@ -77,9 +75,6 @@
     return card;
   }
 
-  // -----------------------------
-  // Render search results
-  // -----------------------------
   function renderResults() {
     const q = searchInput.value.trim();
     resultsList.innerHTML = '';
@@ -89,7 +84,6 @@
       return;
     }
 
-    // SAFE SEARCH: prevents crashes if SPN is missing
     const matches = FAULTS.filter(f => f.spn && f.spn.startsWith(q));
 
     if (!matches.length) {
@@ -100,9 +94,6 @@
     matches.forEach(f => resultsList.appendChild(createFaultCard(f)));
   }
 
-  // -----------------------------
-  // Render pinned faults
-  // -----------------------------
   function renderPinned() {
     pinnedList.innerHTML = '';
     const pinned = FAULTS.filter(f => pinnedSpns.has(f.spn));
@@ -117,17 +108,14 @@
     pinned.forEach(f => pinnedList.appendChild(createFaultCard(f, true)));
   }
 
-  // -----------------------------
-  // Event listeners + startup
-  // -----------------------------
   searchInput.addEventListener('input', renderResults);
+
   renderResults();
   renderPinned();
 
-  // -----------------------------
-  // Register service worker
-  // -----------------------------
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js');
   }
+
+});
 </script>
